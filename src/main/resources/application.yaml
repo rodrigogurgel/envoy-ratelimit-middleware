@@ -1,0 +1,10 @@
+server:
+  port: 8090
+
+spring:
+  application:
+    name: envoy-ratelimit-middleware
+  web:
+    error:
+      whitelabel:
+        enabled: false

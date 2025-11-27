@@ -1,0 +1,25 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: rl-redis
+    ports:
+      - "6379:6379"
+
+  ratelimit:
+    image: envoyproxy/ratelimit:master
+    container_name: rl-service
+    depends_on:
+      - redis
+    environment:
+      - REDIS_SOCKET_TYPE=tcp
+      - REDIS_URL=redis:6379
+      - RUNTIME_ROOT=/data
+      - RUNTIME_SUBDIRECTORY=ratelimit
+      - USE_STATSD=false
+      - LOG_LEVEL=debug
+    volumes:
+      - ./ratelimit:/data/ratelimit
+    ports:
+      - "8081:8081" # gRPC (ShouldRateLimit)
+      - "8080:8080" # HTTP debug/status (opcional)
+    command: ["/bin/ratelimit"]

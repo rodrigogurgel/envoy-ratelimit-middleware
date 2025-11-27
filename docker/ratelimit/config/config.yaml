@@ -1,0 +1,12 @@
+domain: envoy
+
+descriptors:
+  - key: api_key
+    rate_limit:
+      unit: minute
+      requests_per_unit: 5
+
+  - key: api_product
+    rate_limit:
+      unit: minute
+      requests_per_unit: 5
