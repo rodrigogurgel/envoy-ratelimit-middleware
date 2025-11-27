@@ -17,6 +17,7 @@ services:
       - RUNTIME_SUBDIRECTORY=ratelimit
       - USE_STATSD=false
       - LOG_LEVEL=debug
+      - STOP_CACHE_KEY_INCREMENT_WHEN_OVERLIMIT=true
     volumes:
       - ./ratelimit:/data/ratelimit
     ports:
