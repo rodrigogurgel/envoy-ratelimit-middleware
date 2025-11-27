@@ -1,6 +1,7 @@
 package br.com.rodrigogurgel.envoy_ratelimit_middleware.framework.adapter.input.rest.filter
 
 import com.github.michaelbull.result.andThen
+import com.github.michaelbull.result.getOrThrow
 import com.github.michaelbull.result.runCatching
 import com.github.michaelbull.result.toErrorIf
 import io.envoyproxy.envoy.extensions.common.ratelimit.v3.RateLimitDescriptor
@@ -17,15 +18,13 @@ import org.springframework.web.server.WebFilterChain
 import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import java.nio.charset.StandardCharsets
-import com.github.michaelbull.result.Result
-import com.github.michaelbull.result.getOrThrow
-import com.github.michaelbull.result.recoverIf
+import java.util.concurrent.TimeUnit
 
 data class RateLimitExceededException(override val message: String? = null) : RuntimeException(message)
 
 @Component
 class ReactiveRateLimitingFilter(
-    private val rateLimitClient: RateLimitServiceGrpc.RateLimitServiceBlockingStub
+    private val rateLimitClient: RateLimitServiceGrpc.RateLimitServiceFutureStub
 ) : WebFilter {
     companion object {
         private val logger = LoggerFactory.getLogger(ReactiveRateLimitingFilter::class.java)
@@ -89,7 +88,7 @@ class ReactiveRateLimitingFilter(
             .addDescriptors(descriptor)
             .build()
 
-        rateLimitClient.shouldRateLimit(request)
+        rateLimitClient.shouldRateLimit(request).get(15, TimeUnit.MILLISECONDS)
     }
 
     private fun isOverLimit(response: RateLimitResponse): Boolean =

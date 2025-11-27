@@ -19,6 +19,6 @@ class RateLimitClientConfig {
     @Bean
     fun rateLimitBlockingStub(
         channel: ManagedChannel
-    ): RateLimitServiceGrpc.RateLimitServiceBlockingStub =
-        RateLimitServiceGrpc.newBlockingStub(channel)
+    ): RateLimitServiceGrpc.RateLimitServiceFutureStub =
+        RateLimitServiceGrpc.newFutureStub(channel)
 }
