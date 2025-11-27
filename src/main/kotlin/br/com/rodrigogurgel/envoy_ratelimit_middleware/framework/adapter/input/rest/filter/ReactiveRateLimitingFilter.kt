@@ -19,6 +19,8 @@ import reactor.core.publisher.Mono
 import reactor.core.scheduler.Schedulers
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
+import kotlin.collections.component1
+import kotlin.collections.component2
 
 data class RateLimitExceededException(override val message: String? = null) : RuntimeException(message)
 
@@ -34,14 +36,31 @@ class ReactiveRateLimitingFilter(
         val apiKey = exchange.request.headers.getFirst("x-api-key") ?: "anonymous"
         val apiProduct = exchange.request.headers.getFirst("x-api-product") ?: "anonymous"
 
-        val response = shouldRateLimit("api_key", apiKey)
-            .toErrorIf({ isOverLimit(it) }) {
-                RateLimitExceededException()
-            }
-            .andThen { shouldRateLimit("api_product", apiProduct) }
-            .toErrorIf({ isOverLimit(it) }) {
-                RateLimitExceededException()
-            }
+        val response = runCatching {
+            val apiKeyDescriptor = RateLimitDescriptor.newBuilder().addEntries(
+                RateLimitDescriptor.Entry.newBuilder()
+                    .setKey("api_key")
+                    .setValue(apiKey),
+            ).build()
+
+            val apiProductDescriptor = RateLimitDescriptor.newBuilder()
+                .addEntries(
+                    RateLimitDescriptor.Entry.newBuilder()
+                        .setKey("api_product")
+                        .setValue(apiProduct),
+                )
+                .build()
+
+            val request = RateLimitRequest.newBuilder()
+                .setDomain("envoy")
+                .addDescriptors(apiKeyDescriptor)
+                .addDescriptors(apiProductDescriptor)
+                .build()
+
+            rateLimitClient.shouldRateLimit(request).get(15, TimeUnit.MILLISECONDS)
+        }.toErrorIf({ isOverLimit(it) }) {
+            RateLimitExceededException()
+        }
 
         return Mono.fromCallable {
             response.getOrThrow()
@@ -53,6 +72,7 @@ class ReactiveRateLimitingFilter(
                     when (it) {
                         is RateLimitExceededException -> RateLimitResponse.newBuilder()
                             .setOverallCode(RateLimitResponse.Code.OVER_LIMIT).build()
+
                         else -> RateLimitResponse.newBuilder()
                             .setOverallCode(RateLimitResponse.Code.OK).build()
                     }
@@ -71,24 +91,6 @@ class ReactiveRateLimitingFilter(
                     chain.filter(exchange)
                 }
             }
-    }
-
-    private fun shouldRateLimit(key: String, value: String) = runCatching {
-        val descriptor = RateLimitDescriptor.newBuilder()
-            .addEntries(
-                RateLimitDescriptor.Entry.newBuilder()
-                    .setKey(key)
-                    .setValue(value),
-            )
-            .build()
-
-
-        val request = RateLimitRequest.newBuilder()
-            .setDomain("envoy")
-            .addDescriptors(descriptor)
-            .build()
-
-        rateLimitClient.shouldRateLimit(request).get(15, TimeUnit.MILLISECONDS)
     }
 
     private fun isOverLimit(response: RateLimitResponse): Boolean =
